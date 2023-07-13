@@ -1,9 +1,6 @@
 pipeline {
     agent { label 'linux' }
     stages {
-        stage('Init') {
-
-        }
         stage('Setup') {
             steps {
                 echo 'Setting up...'

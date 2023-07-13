@@ -4,9 +4,9 @@ pipeline {
         stage('Setup') {
             steps {
                 echo 'Updating...'
-                sh 'apt update'
+                sh 'apk update'
                 echo '- Installing build tools'
-                sh 'apt install build-essential'
+                sh 'apk add --update alpine-sdk'
             }
         }
         stage('Build') {

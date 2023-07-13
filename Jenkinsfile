@@ -1,19 +1,16 @@
 pipeline {
-    agent { 
-        docker {
-            image 'ubuntu'
-            args '-u root:sudo'
-        }
-    }
+    agent { label 'linux' }
     stages {
+        stage('Init') {
+
+        }
         stage('Setup') {
-            def dockerHome = tool 'MyDocker'
-            env.PATH = "${dockerHome}/bin:${env.PATH}"
             steps {
-                echo 'Updating...'
-                sh 'apt update'
+                echo 'Setting up...'
+                echo '- Updating'
+                sh 'apt-get update'
                 echo '- Installing build tools'
-                sh 'apt install build-essential'
+                sh 'apt-get install -y build-essential'
             }
         }
         stage('Build') {

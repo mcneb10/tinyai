@@ -22,4 +22,5 @@ pipeline {
                 sh './experiments/xor/xor_independent'
             }
         }
+    }
 }

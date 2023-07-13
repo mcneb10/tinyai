@@ -8,3 +8,11 @@
 a.out
 *.o
 
+fit =*
+xor_test.res
+
+.vscode
+experiments/xor/xor
+experiments/xor/xor.exe
+experiments/xor/xor_independent
+experiments/xor/xor_independent.exe

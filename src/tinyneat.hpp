@@ -10,9 +10,10 @@
  *                                      names in a file "specie_names.dict"
  */
 
-
+#if !defined(INDEPENDENT)
 #include <iostream>
 #include <fstream>
+#endif
 #include <vector>
 #include <queue>
 #include <cmath>
@@ -20,7 +21,9 @@
 #include <map>
 #include <algorithm>
 #include <list>
+#include <cstdio>
 #include <string>
+#include "virtual_file.hpp"
 
 namespace neat {
 
@@ -34,9 +37,13 @@ namespace neat {
 		double step_size = 0.1;
 		double disable_mutation_chance = 0.4;
 		double enable_mutation_chance = 0.2;			
-
+		#if INDEPENDENT
+		void read(std::virtual_file& file);
+		void write(std::virtual_file& file, std::string prefix);
+		#else
 		void read(std::ifstream& o);
 		void write(std::ofstream& o, std::string prefix);
+		#endif
 	} mutation_rate_container;
 
 	typedef struct {
@@ -46,8 +53,13 @@ namespace neat {
 		double delta_threshold = 1.3;
 		unsigned int stale_species = 15;
 
+		#if INDEPENDENT
+		void read(std::virtual_file& file);
+		void write(std::virtual_file& file, std::string prefix);
+		#else
 		void read(std::ifstream& o);
 		void write(std::ofstream& o, std::string prefix);
+		#endif
 	} speciating_parameter_container;
 
 	typedef struct {
@@ -65,6 +77,9 @@ namespace neat {
 		double weight = 0.0;
 		bool enabled = true;
 	} gene;
+
+
+
 
 	class genome {
 	private:
@@ -221,12 +236,16 @@ namespace neat {
 		}
 
 		/* import and export */
+		#if INDEPENDENT
+		void import_fromfile(std::virtual_file& file);
+		void export_tofile(std::virtual_file& file);
+		#else
 		void import_fromfile(std::string filename);
-		void export_tofile(std::string filename);		
+		void export_tofile(std::string filename);
+		#endif	
 	};
 	
 	/* now the evolutionary functions itself */
-
 
 	genome pool::crossover(const genome& g1, const genome& g2){
 		// Make sure g1 has the higher fitness, so we will include only disjoint/excess 
@@ -274,7 +293,6 @@ namespace neat {
 		child.max_neuron = std::max(g1.max_neuron, g2.max_neuron);		
 		return child;	
 	}
-
 
 	/* mutations */
 	void pool::mutate_weight(genome& g){		
@@ -393,7 +411,6 @@ namespace neat {
 		g.genes[new_gene.innovation_num] = new_gene;
 	}	
 
-
 	void pool::mutate_node(genome& g){
 		if (g.genes.size() == 0)
 			return ;
@@ -485,8 +502,7 @@ namespace neat {
 			p = p - 1.0;
 		}
 		
-	}
-	
+	}	
 	
 	double pool::disjoint(const genome& g1, const genome& g2){
 		auto it1 = g1.genes.begin();
@@ -554,7 +570,6 @@ namespace neat {
 			total += (*s).average_fitness;
 		return total;
 	}
-
 
 	void pool::cull_species(bool cut_to_one) {
 		for (auto s = this->species.begin(); s != this->species.end(); s++) {
@@ -671,7 +686,7 @@ namespace neat {
 		for (auto s = this->species.begin(); s != this->species.end(); s++)
 			species_pointer.push_back(&(*s));
 		if (this->species.size() == 0)
-			std::cerr << "Wtf? Zero species in the world! All dead? Where is that fucking NOAH and his fucking boat?\n";
+			printf("[ERROR] Wtf? Zero species in the world! All dead? Where is that fucking NOAH and his fucking boat?\n");
 		else
 			while (children.size() + this->species.size() < this->speciating_parameters.population)
 				children.push_back(
@@ -681,7 +696,74 @@ namespace neat {
 			this->add_to_species(children[i]);	
 		this->generation_number++;
 	}	
+	#if INDEPENDENT
+	void pool::import_fromfile(std::virtual_file& file){
+		file.rewind();
+		this->species.clear();
+			// current state
+			unsigned int innovation_num;
+			file.scanf("%u", &innovation_num);
+			this->innovation.set_innovation_number(innovation_num);
+			file.scanf("%u%u", &this->generation_number, &this->max_fitness);
 
+			// network information
+			file.scanf("%u%u%u", &this->network_info.input_size, &this->network_info.output_size, &this->network_info.bias_size);
+			this->network_info.functional_nodes = this->network_info.input_size + 
+				this->network_info.output_size + this->network_info.bias_size;			
+			
+			std::string rec = file.get_str();
+			if (rec == "rec")
+				this->network_info.recurrent = true;
+			if (rec == "nonrec")
+				this->network_info.recurrent = false;
+
+			// population information
+			this->speciating_parameters.read(file);
+
+			// mutation parameters
+			this->mutation_rates.read(file);
+
+			// species information
+			unsigned int species_number;
+			file.scanf("%u", &species_number);
+			this->species.clear();			
+
+			for (unsigned int c = 0; c < species_number; c++){
+				specie new_specie;
+			#ifdef GIVING_NAMES_FOR_SPECIES
+				new_specie.name = file.read_str();
+			#endif
+
+				unsigned int specie_population;
+
+				file.scanf("%u%u%u%u", &new_specie.top_fitness, &new_specie.average_fitness, &new_specie.staleness, &specie_population);
+
+				for (unsigned int i=0; i<specie_population; i++){
+					genome new_genome(this->network_info, this->mutation_rates);
+
+					file.scanf("%u%u%u", &new_genome.fitness, &new_genome.adjusted_fitness, &new_genome.global_rank);
+
+					new_genome.mutation_rates.read(file);
+
+					unsigned int gene_number;
+					file.scanf("%u", &gene_number);
+
+					for (unsigned int j=0; j<gene_number; j++){
+						gene new_gene;
+
+						file.scanf("%u%u%u%lf%c", &new_gene.innovation_num, &new_gene.from_node, &new_gene.to_node, &new_gene.weight, &new_gene.enabled);
+						new_genome.genes[new_gene.innovation_num] = new_gene;
+					}
+					
+					new_specie.genomes.push_back(new_genome);
+				}
+
+				this->species.push_back(new_specie);
+			}
+			
+		}
+	
+	#else
 	void pool::import_fromfile(std::string filename){
 		std::ifstream input;
 		input.open(filename);
@@ -768,7 +850,64 @@ namespace neat {
 
 		input.close();
 	}
+	#endif
+	#if INDEPENDENT
+	void pool::export_tofile(std::virtual_file& file){
 
+		// current state
+		file.concat(std::to_string(this->innovation.number())+"\n"+std::to_string(this->generation_number)+"\n"+std::to_string(this->max_fitness)+"\n");
+
+		// network information
+		file.concat(std::to_string(this->network_info.input_size)+" "+std::to_string(this->network_info.output_size)+" "+std::to_string(this->network_info.bias_size)+"\n");
+		if (this->network_info.recurrent)
+			file.concat("rec\n");
+		else
+			file.concat("nonrec\n");
+		this->network_info.functional_nodes = this->network_info.input_size +
+		   	this->network_info.output_size + this->network_info.bias_size;
+
+		// population information
+		this->speciating_parameters.write(file, "");
+
+		// mutation parameters
+		this->mutation_rates.write(file, "");
+
+		// species information
+		file.concat(std::to_string(this->species.size())+"\n");
+		for (auto s = this->species.begin(); s != this->species.end(); s++){
+			file.concat("   ");
+		#ifdef GIVING_NAMES_FOR_SPECIES
+		// why not use the arrow?
+		// leaving this here anyway
+			file.concat((*s).name+" ");
+		#endif
+			file.concat(std::to_string((*s).top_fitness)+" "+
+			std::to_string((*s).average_fitness)+" "
+			+std::to_string((*s).staleness)+"\n");
+
+			file.concat("   "+std::to_string((*s).genomes.size())+"\n");
+			for (size_t i=0; i<(*s).genomes.size(); i++){
+				file.concat("      "
+				+std::to_string((*s).genomes[i].fitness)+" "
+				+std::to_string((*s).genomes[i].adjusted_fitness)+" "
+				+std::to_string((*s).genomes[i].global_rank)+"\n");
+
+				(*s).genomes[i].mutation_rates.write(file, "      ");
+
+				file.concat("      "+std::to_string((*s).genomes[i].max_neuron)+" "+
+				   	std::to_string((*s).genomes[i].genes.size())+"\n");
+				for (auto it = (*s).genomes[i].genes.begin();
+						it != (*s).genomes[i].genes.end(); it++){
+					gene& g = (*it).second;
+					file.concat("         "+std::to_string(g.innovation_num)+" "+std::to_string(g.from_node)+
+					" "+std::to_string(g.to_node)+" "+std::to_string(g.weight)+" "+std::to_string(g.enabled)+"\n");
+				}
+			}
+
+			file.concat("\n\n");
+		}
+	}
+	#else
 	void pool::export_tofile(std::string filename){
 		std::ofstream output;
 		output.open(filename);
@@ -778,17 +917,17 @@ namespace neat {
 		}
 
 		// current state
-		output << this->innovation.number() << std::endl;
-		output << this->generation_number << std::endl;
-		output << this->max_fitness << std::endl;
+		output << this->innovation.number() << "\n";
+		output << this->generation_number << "\n";
+		output << this->max_fitness << "\n";
 
 		// network information
 		output << this->network_info.input_size << " " <<  this->network_info.output_size << " " <<
-		   	this->network_info.bias_size << std::endl;
+		   	this->network_info.bias_size << "\n";
 		if (this->network_info.recurrent)
-			output << "rec" << std::endl;
+			output << "rec" << "\n";
 		else
-			output << "nonrec" << std::endl;	
+			output << "nonrec" << "\n";	
 		this->network_info.functional_nodes = this->network_info.input_size +
 		   	this->network_info.output_size + this->network_info.bias_size;
 
@@ -799,7 +938,7 @@ namespace neat {
 		this->mutation_rates.write(output, "");
 
 		// species information
-		output << this->species.size() << std::endl;
+		output << this->species.size() << "\n";
 		for (auto s = this->species.begin(); s != this->species.end(); s++){
 			output << "   ";
 		#ifdef GIVING_NAMES_FOR_SPECIES
@@ -807,33 +946,42 @@ namespace neat {
 		#endif
 			output << (*s).top_fitness << " ";
 			output << (*s).average_fitness << " ";
-			output << (*s).staleness << std::endl;
+			output << (*s).staleness << "\n";
 
-			output << "   " << (*s).genomes.size() << std::endl;
+			output << "   " << (*s).genomes.size() << "\n";
 			for (size_t i=0; i<(*s).genomes.size(); i++){
 				output << "      ";
 			    output << (*s).genomes[i].fitness << " ";
 				output << (*s).genomes[i].adjusted_fitness << " ";
-				output << (*s).genomes[i].global_rank << std::endl;
+				output << (*s).genomes[i].global_rank << "\n";
 
 				(*s).genomes[i].mutation_rates.write(output, "      ");
 
 				output << "      " << (*s).genomes[i].max_neuron << " " <<
-				   	(*s).genomes[i].genes.size() << std::endl;
+				   	(*s).genomes[i].genes.size() << "\n";
 				for (auto it = (*s).genomes[i].genes.begin();
 						it != (*s).genomes[i].genes.end(); it++){
 					gene& g = (*it).second;
 					output << "         ";
 					output << g.innovation_num << " " << g.from_node << " " << g.to_node << " "
-						<< g.weight << " " << g.enabled << std::endl;
+						<< g.weight << " " << g.enabled << "\n";
 				}
 			}
 
-			output << std::endl << std::endl;
+			output << "\n" << "\n";
 		}
 		output.close();
 	}
-
+	#endif
+// DO NOT rewind for these
+	#if INDEPENDENT
+	void mutation_rate_container::read(std::virtual_file& file){
+		file.scanf("%lf%lf%lf%lf%lf%lf%lf%lf%lf", &this->connection_mutate_chance,
+		&this->perturb_chance, &this->crossover_chance, &this->link_mutation_chance,
+		&this->node_mutation_chance, &this->bias_mutation_chance, &this->step_size,
+		&this->disable_mutation_chance, &this->enable_mutation_chance);
+	}
+	#else
 	void mutation_rate_container::read(std::ifstream& o){
 		o >> this->connection_mutate_chance;
 		o >> this->perturb_chance;
@@ -845,19 +993,41 @@ namespace neat {
 		o >> this->disable_mutation_chance;
 		o >> this->enable_mutation_chance;
 	}
+	#endif
 
-	void mutation_rate_container::write(std::ofstream& o, std::string prefix){
-		o << prefix << this->connection_mutate_chance << std::endl;
-		o << prefix << this->perturb_chance << std::endl;
-		o << prefix << this->crossover_chance << std::endl;
-		o << prefix << this->link_mutation_chance << std::endl;
-		o << prefix << this->node_mutation_chance << std::endl;
-		o << prefix << this->bias_mutation_chance << std::endl;
-		o << prefix << this->step_size << std::endl;
-		o << prefix << this->disable_mutation_chance << std::endl;
-		o << prefix << this->enable_mutation_chance << std::endl;
+	#if INDEPENDENT
+	void mutation_rate_container::write(std::virtual_file& file, std::string prefix){
+		file.concat(
+		prefix+std::to_string(this->connection_mutate_chance)+"\n"+
+		prefix+std::to_string(this->perturb_chance)+"\n"+
+		prefix+std::to_string(this->crossover_chance)+"\n"+
+		prefix+std::to_string(this->link_mutation_chance)+"\n"+
+		prefix+std::to_string(this->node_mutation_chance)+"\n"+
+		prefix+std::to_string(this->bias_mutation_chance)+"\n"+
+		prefix+std::to_string(this->step_size)+"\n"+
+		prefix+std::to_string(this->disable_mutation_chance)+"\n"+
+		prefix+std::to_string(this->enable_mutation_chance)+"\n");
 	}	
+	#else
+	void mutation_rate_container::write(std::ofstream& o, std::string prefix){
+		o << prefix << this->connection_mutate_chance << "\n";
+		o << prefix << this->perturb_chance << "\n";
+		o << prefix << this->crossover_chance << "\n";
+		o << prefix << this->link_mutation_chance << "\n";
+		o << prefix << this->node_mutation_chance << "\n";
+		o << prefix << this->bias_mutation_chance << "\n";
+		o << prefix << this->step_size << "\n";
+		o << prefix << this->disable_mutation_chance << "\n";
+		o << prefix << this->enable_mutation_chance << "\n";
+	}	
+	#endif
 
+	#if INDEPENDENT
+	void speciating_parameter_container::read(std::virtual_file& file){
+		file.scanf("%u%lf%lf%lf%u", &this->population, &this->delta_disjoint, &this->delta_weights,
+		&this->delta_threshold, &this->stale_species);
+	}
+	#else
 	void speciating_parameter_container::read(std::ifstream& o){
 		o >> this->population;
 		o >> this->delta_disjoint;
@@ -865,14 +1035,25 @@ namespace neat {
 		o >> this->delta_threshold;
 		o >> this->stale_species; 
 	}
+	#endif
 
-	void speciating_parameter_container::write(std::ofstream& o, std::string prefix){
-		o << prefix << this->population << std::endl;
-		o << prefix << this->delta_disjoint << std::endl;
-		o << prefix << this->delta_weights << std::endl;
-		o << prefix << this->delta_threshold << std::endl;
-		o << prefix << this->stale_species << std::endl; 
+	#if INDEPENDENT
+	void speciating_parameter_container::write(std::virtual_file& file, std::string prefix){
+		file.concat(prefix+std::to_string(this->population)+ "\n"+
+		prefix+std::to_string(this->delta_disjoint)+"\n"+
+		prefix+std::to_string(this->delta_weights)+"\n"+
+		prefix+std::to_string(this->delta_threshold)+"\n"+
+		prefix+std::to_string(this->stale_species)+"\n"); 
 	}
+	#else
+	void speciating_parameter_container::write(std::ofstream& o, std::string prefix){
+		o << prefix << this->population << "\n";
+		o << prefix << this->delta_disjoint << "\n";
+		o << prefix << this->delta_weights << "\n";
+		o << prefix << this->delta_threshold << "\n";
+		o << prefix << this->stale_species << "\n"; 
+	}
+	#endif
 
 } // end of namespace neat
 

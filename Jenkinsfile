@@ -1,13 +1,14 @@
 pipeline {
-    agent none
-    stages {
-        agent { 
-            docker {
-                image 'ubuntu'
-                args '-u root:sudo'
-            }
+    agent { 
+        docker {
+            image 'ubuntu'
+            args '-u root:sudo'
         }
+    }
+    stages {
         stage('Setup') {
+            def dockerHome = tool 'MyDocker'
+            env.PATH = "${dockerHome}/bin:${env.PATH}"
             steps {
                 echo 'Updating...'
                 sh 'apt update'

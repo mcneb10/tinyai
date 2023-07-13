@@ -1,12 +1,17 @@
 pipeline {
-    agent { label 'linux' }
+    agent { 
+        docker {
+            image 'ubuntu'
+            args '-u root:sudo'
+        }
+    }
     stages {
         stage('Setup') {
             steps {
                 echo 'Updating...'
-                sh 'apk update'
+                sh 'apt update'
                 echo '- Installing build tools'
-                sh 'apk add --update alpine-sdk'
+                sh 'apt install build-essential'
             }
         }
         stage('Build') {

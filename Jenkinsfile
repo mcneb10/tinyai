@@ -5,9 +5,9 @@ pipeline {
             steps {
                 echo 'Setting up...'
                 echo '- Updating'
-                sh 'apt-get update'
+                sh 'sudo apt-get update'
                 echo '- Installing build tools'
-                sh 'apt-get install -y build-essential'
+                sh 'sudo apt-get install -y build-essential'
             }
         }
         stage('Build') {

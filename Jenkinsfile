@@ -1,11 +1,12 @@
 pipeline {
-    agent { 
-        docker {
-            image 'ubuntu'
-            args '-u root:sudo'
-        }
-    }
+    agent none
     stages {
+        agent { 
+            docker {
+                image 'ubuntu'
+                args '-u root:sudo'
+            }
+        }
         stage('Setup') {
             steps {
                 echo 'Updating...'

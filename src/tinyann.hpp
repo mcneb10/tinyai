@@ -30,8 +30,22 @@ namespace ann
 		int type = 0; // 0 = ordinal, 1 = input, 2 = output, 3 = bias
 		double value = 0.0;
 		bool visited = false;
+		#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		double(*)(std::vector<double>) aggregation = neat::aggregation::sum;
+		std::string aggregation_name = "sum";
+		double(*)(double) activation = neat::activation::sigmoid;
+		std::string activation_name = "sigmoid";
+		#endif
 		std::vector<std::pair<size_t, double>> in_nodes;
 		neuron() {}
+		#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		neuron(double(*)(std::vector<double>) ag, std::string agn, double(*)(double) ac, std::string acn) {
+			aggregation = ag;
+			aggregation_name = agn;
+			activation = ac;
+			activation_name = acn;
+		}
+		#endif
 		~neuron() { in_nodes.clear(); }
 	};
 
@@ -44,12 +58,15 @@ namespace ann
 		std::vector<size_t> input_nodes;
 		std::vector<size_t> bias_nodes;
 		std::vector<size_t> output_nodes;
-
+		#if !defined(CHANGEABLE_ACTIVATION_AND_AGGREGATION)
 		double sigmoid(double x)
 		{
 			return 2.0 / (1.0 + std::exp(-4.9 * x)) - 1;
 		}
-
+		#else
+		std::map<std::string, double (*)(double)> activation_funcs;
+		std::map<std::string, double (*)(std::vector<double>)> aggregation_funcs;
+		#endif
 		void evaluate_nonrecurrent(const std::vector<double> &input, std::vector<double> &output)
 		{
 
@@ -79,9 +96,18 @@ namespace ann
 				if (nodes[t].visited == true)
 				{
 					double sum = 0.0;
+					// first is the other node
+					// second is weight
+					#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+						std::vector<double> input;
+						for (size_t i = 0; i < nodes[t].in_nodes.size(); i++)
+							input.push_back(nodes[nodes[t].in_nodes[i].first].value * nodes[t].in_nodes[i].second);
+						nodes[t].value = nodes[t].activation(nodes[t].aggregation(input));
+					#else
 					for (size_t i = 0; i < nodes[t].in_nodes.size(); i++)
 						sum += nodes[nodes[t].in_nodes[i].first].value * nodes[t].in_nodes[i].second;
 					nodes[t].value = sigmoid(sum);
+					#endif
 					s.pop();
 				}
 
@@ -214,7 +240,7 @@ namespace ann
 			std::string rec = file.get_str();
 			if (rec == "recurrent")
 				this->recurrent = true;
-			if (rec == "non_recurrent")
+			if (rec == "non_recurrent") // FIXME: semi-bug files have this as "non-recurrent", but non-recurrent is the default anyway
 				this->recurrent = false;
 
 			unsigned int neuron_number;
@@ -238,10 +264,17 @@ namespace ann
 				nodes[i].type = type;
 
 				file.scanf("%u", &input_size);
+
+				#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					nodes[i].aggregation_name = file.get_str();
+					nodes[i].activation_name = file.get_str();
+					nodes[i].aggregation = this->aggregation_funcs.at(nodes[i].aggregation_name);
+					nodes[i].activation = this->activation_funcs.at(nodes[i].activation_name);
+				#endif
 				for (unsigned int j = 0; j < input_size; j++)
 				{
-					unsigned int t;
-					double w;
+					unsigned int t; //connected node
+					double w; // weight
 					file.scanf("%u", &t);
 					file.scanf("%lf", &w);
 					nodes[i].in_nodes.push_back(std::make_pair(t, w));
@@ -269,7 +302,7 @@ namespace ann
 					this->recurrent = true;
 				if (rec == "non_recurrent")
 					this->recurrent = false;
-
+				// TODO: add extra identifier to tell neural network we are in CHANGEABLE_ACTIVATION_AND_AGGREGATION mode
 				unsigned int neuron_number;
 				o >> neuron_number;
 				this->nodes.resize(neuron_number);
@@ -279,6 +312,7 @@ namespace ann
 					unsigned int input_size, type; // 0 = ordinal, 1 = input, 2 = output
 					nodes[i].value = 0.0;
 					nodes[i].visited = false;
+
 
 					o >> type;
 					if (type == 1)
@@ -291,6 +325,14 @@ namespace ann
 					nodes[i].type = type;
 
 					o >> input_size;
+
+					#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+						o >> nodes[i].aggregation_name;
+						o >> nodes[i].activation_name;
+						nodes[i].aggregation = this->aggregation_funcs.at(nodes[i].aggregation_name);
+						nodes[i].activation = this->activation_funcs.at(nodes[i].activation_name);
+					#endif
+
 					for (unsigned int j = 0; j < input_size; j++)
 					{
 						unsigned int t;
@@ -322,6 +364,10 @@ namespace ann
 			for (size_t i = 0; i < nodes.size(); i++)
 			{
 				file.concat(std::to_string(nodes[i].type)+" "+std::to_string(nodes[i].in_nodes.size())+"\n");
+				#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					file.concat(nodes[i].aggregation_name+"\n");
+					file.concat(nodes[i].activation_name+"\n");
+				#endif
 				for (unsigned int j = 0; j < nodes[i].in_nodes.size(); j++)
 				{
 					file.concat(std::to_string(nodes[i].in_nodes[j].first)+" "+
@@ -346,6 +392,10 @@ namespace ann
 			{
 				o << nodes[i].type << " ";
 				o << nodes[i].in_nodes.size() << "\n";
+				#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					o << nodes[i].aggregation_name << "\n";
+					o << nodes[i].activation_name << "\n";
+				#endif
 				for (unsigned int j = 0; j < nodes[i].in_nodes.size(); j++)
 					o << nodes[i].in_nodes[j].first << " "
 					  << nodes[i].in_nodes[j].second << " ";

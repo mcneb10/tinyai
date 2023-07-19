@@ -133,6 +133,12 @@ namespace neat
 		unsigned int to_node = -1;
 		double weight = 0.0;
 		bool enabled = true;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		double (*aggregation)(std::vector<double>);
+		std::string aggregation_name;
+		double (*activation)(double);
+		std::string activation_name;
+#endif
 	} gene;
 
 	class genome
@@ -225,6 +231,10 @@ namespace neat
 		void mutate_enable_disable(genome &g, bool enable);
 		void mutate_link(genome &g, bool force_bias);
 		void mutate_node(genome &g);
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		void mutate_activation_func(genome &g);
+		void mutate_aggregation_func(genome &g);
+#endif
 		void mutate(genome &g);
 
 		double disjoint(const genome &g1, const genome &g2);
@@ -266,12 +276,17 @@ namespace neat
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
 		std::map<std::string, double (*)(double)> activation_funcs;
 		std::map<std::string, double (*)(std::vector<double>)> aggregation_funcs;
+		std::string dac;
+		std::string dag;
 		pool(unsigned int input, unsigned int output, unsigned int bias = 1,
 			 bool rec = false, mutation_rate_container m = mutation_rate_container(),
 			 speciating_parameter_container s = speciating_parameter_container(),
 			 network_info_container c = network_info_container(),
-			 std::map<std::string, double (*)(double)> ac = {"sigmoid", neat::activation::sigmoid},
-			 std::map<std::string, double (*)(std::vector<double>)> ag = {"sum", neat::activation::sum})
+			 std::map<std::string, double (*)(double)> ac = {"sigmoid", &neat::activation::sigmoid},
+			 std::map<std::string, double (*)(std::vector<double>)> ag = {"sum", &neat::aggregation::sum},
+			 std::string defaultActivation = "sigmoid", // set these to empty if you want them randomly chosen
+			 std::string defaultAggregation = "sum")
+		// If default function name null all nodes will have a random aggregation/activation function
 		{
 #else
 
@@ -281,22 +296,23 @@ namespace neat
 			 speciating_parameter_container s = speciating_parameter_container(),
 			 network_info_container c = network_info_container())
 		{
-			#endif
+#endif
 			this->network_info.input_size = input;
 			this->network_info.output_size = output;
 			this->network_info.bias_size = bias;
 			this->network_info.functional_nodes = input + output + bias;
 			this->network_info.recurrent = rec;
-			
 
 			this->network_info = c;
 			this->speciating_parameters = s;
 			this->mutation_rates = m;
 
-			#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
 			this->activation_funcs = ac;
 			this->aggregation_funcs = ag;
-			#endif
+			this->dac = defaultActivation;
+			this->dag = defaultAggregation;
+#endif
 
 			// seed the mersenne twister with
 			// a random number from our computer
@@ -336,7 +352,6 @@ namespace neat
 	};
 
 	/* now the evolutionary functions itself */
-
 	genome pool::crossover(const genome &g1, const genome &g2)
 	{
 		// Make sure g1 has the higher fitness, so we will include only
@@ -549,6 +564,30 @@ namespace neat
 		new_gene1.weight = 1.0;
 		new_gene1.innovation_num = this->innovation.add_gene(new_gene1);
 		new_gene1.enabled = true;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		if (this->dag.empty())
+		{
+			auto t = this->aggregation_funcs.begin();
+			std::advance(t, rand() % this->aggregation_funcs.size());
+			new_gene1.aggregation_name = t->first;
+		}
+		else
+		{
+			new_gene1.aggregation_name = this->dag;
+		}
+		if (this->dac.empty())
+		{
+			auto t = this->activation_funcs.begin();
+			std::advance(t, rand() % this->activation_funcs.size());
+			new_gene1.activation_name = t->first;
+		}
+		else
+		{
+			new_gene1.activation_name = this->dac;
+		}
+		new_gene1.aggregation = this->aggregation_funcs.at(new_gene1.aggregation_name);
+		new_gene1.activation = this->activation_funcs.at(new_gene1.activation_name);
+#endif
 
 		gene new_gene2;
 		new_gene2.from_node = g.max_neuron - 1; // from the last created neuron
@@ -556,10 +595,71 @@ namespace neat
 		new_gene2.weight = (*it).second.weight;
 		new_gene2.innovation_num = this->innovation.add_gene(new_gene2);
 		new_gene2.enabled = true;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		if (this->dag.empty())
+		{
+			auto t = this->aggregation_funcs.begin();
+			std::advance(t, rand() % this->aggregation_funcs.size());
+			new_gene2.aggregation_name = t->first;
+		}
+		else
+		{
+			new_gene2.aggregation_name = this->dag;
+		}
+		if (this->dac.empty())
+		{
+			auto t = this->activation_funcs.begin();
+			std::advance(t, rand() % this->activation_funcs.size());
+			new_gene2.activation_name = t->first;
+		}
+		else
+		{
+			new_gene2.activation_name = this->dac;
+		}
+		new_gene2.aggregation = this->aggregation_funcs.at(new_gene2.aggregation_name);
+		new_gene2.activation = this->activation_funcs.at(new_gene2.activation_name);
+#endif
 
 		g.genes[new_gene1.innovation_num] = new_gene1;
 		g.genes[new_gene2.innovation_num] = new_gene2;
 	}
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+	void pool::mutate_activation_func(genome &g)
+	{
+		if (g.genes.size() == 0)
+			return;
+
+		// randomly choose a gene to mutate
+		std::uniform_int_distribution<unsigned int> distributor(0,
+																g.genes.size() - 1);
+		unsigned int gene_id = distributor(this->generator);
+		auto it = g.genes.begin();
+		std::advance(it, gene_id);
+
+		auto t = this->activation_funcs.begin();
+		std::advance(t, rand() % this->activation_funcs.size());
+		it->second.activation_name = t->first;
+		it->second.activation = this->activation_funcs.at(it->second.activation_name);
+	}
+	void pool::mutate_aggregation_func(genome &g)
+	{
+		if (g.genes.size() == 0)
+			return;
+
+		// randomly choose a gene to mutate
+		std::uniform_int_distribution<unsigned int> distributor(0,
+																g.genes.size() - 1);
+		unsigned int gene_id = distributor(this->generator);
+		auto it = g.genes.begin();
+		std::advance(it, gene_id);
+
+		auto t = this->aggregation_funcs.begin();
+		std::advance(t, rand() % this->aggregation_funcs.size());
+		it->second.aggregation_name = t->first;
+		it->second.aggregation = this->aggregation_funcs.at(it->second.aggregation_name);
+	}
+#endif
 
 	void pool::mutate(genome &g)
 	{
@@ -581,6 +681,11 @@ namespace neat
 			coefficient[coin_flip(this->generator)];
 		g.mutation_rates.crossover_chance *= coefficient[coin_flip(this->generator)];
 		g.mutation_rates.perturb_chance *= coefficient[coin_flip(this->generator)];
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		g.mutation_rates.activation_mutate_chance *= coefficient[coin_flip(this->generator)];
+		g.mutation_rates.aggregation_mutate_chance *= coefficient[coin_flip(this->generator)];
+#endif
 
 		std::uniform_real_distribution<double> mutate_or_not_mutate(0.0, 1.0);
 
@@ -630,6 +735,26 @@ namespace neat
 				this->mutate_enable_disable(g, false);
 			p = p - 1.0;
 		}
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		p = this->mutation_rates.aggregation_mutate_chance;
+		while (p > 0.0)
+		{
+			if (mutate_or_not_mutate(this->generator) < p)
+			{
+				this->mutate_aggregation_func(g);
+			}
+			p = p - 1.0;
+		}
+		p = this->mutation_rates.activation_mutate_chance;
+		while (p > 0.0)
+		{
+			if (mutate_or_not_mutate(this->generator) < p)
+			{
+				this->mutate_activation_func(g);
+			}
+			p = p - 1.0;
+		}
+#endif
 	}
 
 	double pool::disjoint(const genome &g1, const genome &g2)
@@ -880,7 +1005,13 @@ namespace neat
 			this->network_info.recurrent = true;
 		if (rec == "nonrec")
 			this->network_info.recurrent = false;
-
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		if (file.get_str() != "CHANGEABLE_ACTIVATION_AND_AGGREGATION")
+		{
+			printf("[ERROR] Failed to import a neat::pool without CHANGEABLE_ACTIVATION_AND_AGGREGATION enabled");
+			exit(-1);
+		}
+#endif
 		// population information
 		this->speciating_parameters.read(file);
 
@@ -922,6 +1053,12 @@ namespace neat
 
 					file.scanf("%u%u%u%lf%c", &new_gene.innovation_num, &new_gene.from_node,
 							   &new_gene.to_node, &new_gene.weight, &new_gene.enabled);
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					new_gene.aggregation_name = file.read_str();
+					new_gene.activation_name = file.read_str();
+					new_gene.aggregation = this->aggregation_funcs.at(new_gene.aggregation_name);
+					new_gene.activation = this->activation_funcs.at(new_gene.activation_name);
+#endif
 					new_genome.genes[new_gene.innovation_num] = new_gene;
 				}
 
@@ -931,7 +1068,6 @@ namespace neat
 			this->species.push_back(new_specie);
 		}
 	}
-
 #else
 	void pool::import_fromfile(std::string filename)
 	{
@@ -966,7 +1102,13 @@ namespace neat
 				this->network_info.recurrent = true;
 			if (rec == "nonrec")
 				this->network_info.recurrent = false;
-
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+			input >> rec;
+			if (rec != "CHANGEABLE_ACTIVATION_AND_AGGREGATION")
+			{
+				throw "[ERROR] Failed to import a neat::pool without CHANGEABLE_ACTIVATION_AND_AGGREGATION enabled";
+			}
+#endif
 			// population information
 			this->speciating_parameters.read(input);
 
@@ -1011,6 +1153,12 @@ namespace neat
 						input >> new_gene.to_node;
 						input >> new_gene.weight;
 						input >> new_gene.enabled;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+						input >> new_gene.aggregation_name;
+						input >> new_gene.activation_name;
+						new_gene.aggregation = this->aggregation_funcs.at(new_gene.aggregation_name);
+						new_gene.activation = this->activation_funcs.at(new_gene.activation_name);
+#endif
 						new_genome.genes[new_gene.innovation_num] = new_gene;
 					}
 
@@ -1045,6 +1193,9 @@ namespace neat
 			file.concat("rec\n");
 		else
 			file.concat("nonrec\n");
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		file.concat("CHANGEABLE_ACTIVATION_AND_AGGREGATION\n");
+#endif
 		this->network_info.functional_nodes = this->network_info.input_size +
 											  this->network_info.output_size +
 											  this->network_info.bias_size;
@@ -1063,7 +1214,9 @@ namespace neat
 #ifdef GIVING_NAMES_FOR_SPECIES
 			// why not use the arrow?
 			// leaving this here anyway
-			file.concat((*s).name + " ");
+
+			// bugfix: this needs to end with \n not a space for it to be read correctly
+			file.concat((*s).name + "\n");
 #endif
 			file.concat(std::to_string((*s).top_fitness) + " " +
 						std::to_string((*s).average_fitness) + " " +
@@ -1088,6 +1241,9 @@ namespace neat
 								std::to_string(g.from_node) + " " +
 								std::to_string(g.to_node) + " " + std::to_string(g.weight) +
 								" " + std::to_string(g.enabled) + "\n");
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					file.concat(g.aggregation_name + "\n" + g.activation_name + "\n");
+#endif
 				}
 			}
 
@@ -1120,6 +1276,9 @@ namespace neat
 		else
 			output << "nonrec"
 				   << "\n";
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		output << "CHANGEABLE_ACTIVATION_AND_AGGREGATION\n";
+#endif
 		this->network_info.functional_nodes = this->network_info.input_size +
 											  this->network_info.output_size +
 											  this->network_info.bias_size;
@@ -1136,7 +1295,7 @@ namespace neat
 		{
 			output << "   ";
 #ifdef GIVING_NAMES_FOR_SPECIES
-			output << (*s).name << " ";
+			output << (*s).name << "\n";
 #endif
 			output << (*s).top_fitness << " ";
 			output << (*s).average_fitness << " ";
@@ -1161,6 +1320,10 @@ namespace neat
 					output << "         ";
 					output << g.innovation_num << " " << g.from_node << " " << g.to_node
 						   << " " << g.weight << " " << g.enabled << "\n";
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					output << g.aggregation_name << "\n"
+						   << g.activation_name << "\n";
+#endif
 				}
 			}
 
@@ -1179,6 +1342,9 @@ namespace neat
 				   &this->link_mutation_chance, &this->node_mutation_chance,
 				   &this->bias_mutation_chance, &this->step_size,
 				   &this->disable_mutation_chance, &this->enable_mutation_chance);
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		file.scanf("%lf%lf", &this->activation_mutate_chance, &this->aggregation_mutate_chance);
+#endif
 	}
 #else
 	void mutation_rate_container::read(std::ifstream &o)
@@ -1192,6 +1358,10 @@ namespace neat
 		o >> this->step_size;
 		o >> this->disable_mutation_chance;
 		o >> this->enable_mutation_chance;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		o >> this->activation_mutate_chance;
+		o >> this->aggregation_mutate_chance;
+#endif
 	}
 #endif
 
@@ -1208,6 +1378,10 @@ namespace neat
 					std::to_string(this->step_size) + "\n" + prefix +
 					std::to_string(this->disable_mutation_chance) + "\n" + prefix +
 					std::to_string(this->enable_mutation_chance) + "\n");
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		file.concat(prefix + std::to_string(this->activation_mutate_chance) + "\n" +
+					prefix + std::to_string(this->aggregation_mutate_chance) + "\n");
+#endif
 	}
 #else
 	void mutation_rate_container::write(std::ofstream &o, std::string prefix)
@@ -1221,6 +1395,10 @@ namespace neat
 		o << prefix << this->step_size << "\n";
 		o << prefix << this->disable_mutation_chance << "\n";
 		o << prefix << this->enable_mutation_chance << "\n";
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		o << prefix << this->activation_mutate_chance << "\n";
+		o << prefix << this->aggregation_mutate_chance << "\n";
+#endif
 	}
 #endif
 

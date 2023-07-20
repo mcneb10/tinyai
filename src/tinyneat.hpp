@@ -293,8 +293,7 @@ namespace neat
 		// constructor
 		pool(unsigned int input, unsigned int output, unsigned int bias = 1,
 			 bool rec = false, mutation_rate_container m = mutation_rate_container(),
-			 speciating_parameter_container s = speciating_parameter_container(),
-			 network_info_container c = network_info_container())
+			 speciating_parameter_container s = speciating_parameter_container())
 		{
 #endif
 			this->network_info.input_size = input;
@@ -303,7 +302,6 @@ namespace neat
 			this->network_info.functional_nodes = input + output + bias;
 			this->network_info.recurrent = rec;
 
-			this->network_info = c;
 			this->speciating_parameters = s;
 			this->mutation_rates = m;
 

@@ -9,10 +9,14 @@ a.out
 *.o
 
 fit =*
+fitc =*
 xor_test.res
+xor_test.resc
 
 .vscode
 experiments/xor/xor
 experiments/xor/xor.exe
 experiments/xor/xor_independent
 experiments/xor/xor_independent.exe
+experiments/xor/xor_changeable_activation_aggregation
+experiments/xor/xor_changeable_activation_aggregation.exe

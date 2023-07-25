@@ -30,23 +30,23 @@ namespace neat
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
 	namespace aggregation
 	{
-		double sum(std::vector<double> a)
+		double sum(std::vector<double> &a)
 		{
 			double r = 0;
 			for (auto n : a)
 				r += n;
 			return r;
 		}
-		double product(std::vector<double> a)
+		double product(std::vector<double> &a)
 		{
 			double r = 1;
 			for (auto n : a)
 				r *= n;
 			return r;
 		}
-		double max(std::vector<double> a) { return std::max_element(a); }
-		double min(std::vector<double> a) { return std::min_element(a); }
-		double median(std::vector<double> a)
+		double max(std::vector<double> &a) { return *std::max_element(a.begin(), a.end()); }
+		double min(std::vector<double> &a) { return *std::min_element(a.begin(), a.end()); }
+		double median(std::vector<double> &a)
 		{
 			if (a.size() % 2 == 0)
 			{
@@ -54,7 +54,7 @@ namespace neat
 			}
 			return a[a.size() / 2];
 		}
-		double mean(std::vector<double> a)
+		double mean(std::vector<double> &a)
 		{
 			double r = 0;
 			for (auto n : a)
@@ -134,7 +134,7 @@ namespace neat
 		double weight = 0.0;
 		bool enabled = true;
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
-		double (*aggregation)(std::vector<double>);
+		double (*aggregation)(std::vector<double> &);
 		std::string aggregation_name;
 		double (*activation)(double);
 		std::string activation_name;
@@ -275,15 +275,15 @@ namespace neat
 
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
 		std::map<std::string, double (*)(double)> activation_funcs;
-		std::map<std::string, double (*)(std::vector<double>)> aggregation_funcs;
+		std::map<std::string, double (*)(std::vector<double> &)> aggregation_funcs;
 		std::string dac;
 		std::string dag;
 		pool(unsigned int input, unsigned int output, unsigned int bias = 1,
 			 bool rec = false, mutation_rate_container m = mutation_rate_container(),
 			 speciating_parameter_container s = speciating_parameter_container(),
 			 network_info_container c = network_info_container(),
-			 std::map<std::string, double (*)(double)> ac = {"sigmoid", &neat::activation::sigmoid},
-			 std::map<std::string, double (*)(std::vector<double>)> ag = {"sum", &neat::aggregation::sum},
+			 std::map<std::string, double (*)(double)> ac = {{std::string("sigmoid"), &neat::activation::sigmoid}},
+			 std::map<std::string, double (*)(std::vector<double> &)> ag = {{std::string("sum"), &neat::aggregation::sum}},
 			 std::string defaultActivation = "sigmoid", // set these to empty if you want them randomly chosen
 			 std::string defaultAggregation = "sum")
 		// If default function name null all nodes will have a random aggregation/activation function
@@ -522,6 +522,31 @@ namespace neat
 		new_gene.from_node = neuron1;
 		new_gene.to_node = neuron2;
 
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		if (this->dag.empty())
+		{
+			auto t = this->aggregation_funcs.begin();
+			std::advance(t, rand() % this->aggregation_funcs.size());
+			new_gene.aggregation_name = t->first;
+		}
+		else
+		{
+			new_gene.aggregation_name = this->dag;
+		}
+		if (this->dac.empty())
+		{
+			auto t = this->activation_funcs.begin();
+			std::advance(t, rand() % this->activation_funcs.size());
+			new_gene.activation_name = t->first;
+		}
+		else
+		{
+			new_gene.activation_name = this->dac;
+		}
+		new_gene.aggregation = this->aggregation_funcs.at(new_gene.aggregation_name);
+		new_gene.activation = this->activation_funcs.at(new_gene.activation_name);
+#endif
+
 		// if genome already has this connection
 		for (auto it = g.genes.begin(); it != g.genes.end(); it++)
 			if ((*it).second.from_node == neuron1 && (*it).second.to_node == neuron2)
@@ -637,7 +662,7 @@ namespace neat
 
 		auto t = this->activation_funcs.begin();
 		std::advance(t, rand() % this->activation_funcs.size());
-		it->second.activation_name = t->first;
+		it->second.activation_name = it->second.activation_name;
 		it->second.activation = this->activation_funcs.at(it->second.activation_name);
 	}
 	void pool::mutate_aggregation_func(genome &g)
@@ -654,7 +679,7 @@ namespace neat
 
 		auto t = this->aggregation_funcs.begin();
 		std::advance(t, rand() % this->aggregation_funcs.size());
-		it->second.aggregation_name = t->first;
+		it->second.aggregation_name = it->second.aggregation_name;
 		it->second.aggregation = this->aggregation_funcs.at(it->second.aggregation_name);
 	}
 #endif
@@ -1073,7 +1098,7 @@ namespace neat
 		input.open(filename);
 		if (!input.is_open())
 		{
-			std::cerr << "cannot open file '" << filename << "' !";
+			std::cerr << "cannot open file '" << filename << "' !\n";
 			return;
 		}
 
@@ -1104,7 +1129,7 @@ namespace neat
 			input >> rec;
 			if (rec != "CHANGEABLE_ACTIVATION_AND_AGGREGATION")
 			{
-				throw "[ERROR] Failed to import a neat::pool without CHANGEABLE_ACTIVATION_AND_AGGREGATION enabled";
+				throw "[ERROR] Failed to import a neat::pool without CHANGEABLE_ACTIVATION_AND_AGGREGATION enabled\n";
 			}
 #endif
 			// population information

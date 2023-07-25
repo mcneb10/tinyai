@@ -31,9 +31,9 @@ namespace ann
 		double value = 0.0;
 		bool visited = false;
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
-		double (*aggregation)(std::vector<double>) = neat::aggregation::sum;
+		double (*aggregation)(std::vector<double>&) = &neat::aggregation::sum;
 		std::string aggregation_name = "sum";
-		double (*activation)(double) = neat::activation::sigmoid;
+		double (*activation)(double) = &neat::activation::sigmoid;
 		std::string activation_name = "sigmoid";
 #endif
 		std::vector<std::pair<size_t, double>> in_nodes;
@@ -42,7 +42,7 @@ namespace ann
 	};
 
 	// NOTE: you MUST set activation_funcs and aggregation_funcs when you make a ann::neuralnet
-	// otherwise things will break!
+	// in CHANGEABLE_ACTIVATION_AND_AGGREGATION mode otherwise things will break!
 	class neuralnet
 	{
 	private:
@@ -58,8 +58,10 @@ namespace ann
 			return 2.0 / (1.0 + std::exp(-4.9 * x)) - 1;
 		}
 #else
+	public:
 		std::map<std::string, double (*)(double)> activation_funcs;
-		std::map<std::string, double (*)(std::vector<double>)> aggregation_funcs;
+		std::map<std::string, double (*)(std::vector<double>&)> aggregation_funcs;
+	private:
 #endif
 		void evaluate_nonrecurrent(const std::vector<double> &input, std::vector<double> &output)
 		{

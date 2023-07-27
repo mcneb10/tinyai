@@ -1,4 +1,3 @@
-#define INDEPENDENT 1
 #include <cstdio>
 #include <string>
 #include <cstdlib>

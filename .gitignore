@@ -20,3 +20,5 @@ experiments/xor/xor_independent
 experiments/xor/xor_independent.exe
 experiments/xor/xor_changeable_activation_aggregation
 experiments/xor/xor_changeable_activation_aggregation.exe
+experiments/xor/xor_changeable_activation_aggregation_independent
+experiments/xor/xor_changeable_activation_aggregation_independent.exe

@@ -40,17 +40,25 @@ unsigned int xor_test(ann::neuralnet& n, bool write_output){
 }
 
 
-void test_output(){
-	ann::neuralnet n;
-	n.activation_funcs = {{std::string("sigmoid"), &neat::activation::sigmoid}};
-	n.aggregation_funcs = {{std::string("sum"), &neat::aggregation::sum}};
-	n.import_fromfile("fitc = 200");
-	xor_test(n, true);	
+void test_output(std::vector<std::virtual_file> files){
+	for (std::virtual_file file : files)
+	{
+		if (file.name == "fitc = 200")
+		{
+			ann::neuralnet n;
+			n.activation_funcs = {{std::string("sigmoid"), &neat::activation::sigmoid}};
+			n.aggregation_funcs = {{std::string("sum"), &neat::aggregation::sum}};
+			n.import_fromfile(file);
+			xor_test(n, true);
+			return;
+		}
+	}
 }
 
 int main(){
+	std::vector<std::virtual_file> files;
 	neat::pool p(2, 1, 0, false);
-	p.import_fromfile("xor_test.resc");	
+	//p.import_fromfile("xor_test.resc");	
 	srand(time(NULL));
 	unsigned int max_fitness = 0;
 	while (max_fitness < 200){
@@ -66,8 +74,9 @@ int main(){
 					min_fitness = current_fitness;
 				if (current_fitness > max_fitness){
 					max_fitness = current_fitness;
-					std::string fname = "fitc = " + std::to_string(current_fitness);
-					n.export_tofile(fname);
+					std::virtual_file file("fitc = " + std::to_string(current_fitness));
+					n.export_tofile(file);
+					files.push_back(file);
 				}
 				g.fitness = current_fitness;
 			}
@@ -76,7 +85,8 @@ int main(){
 		p.new_generation();
 	}
 
-	test_output();
-	p.export_tofile("xor_test.resc");
+	test_output(files);
+	std::virtual_file result("xor_test.resc");
+	p.export_tofile(result);
 	return 0;
 }

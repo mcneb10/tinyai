@@ -12,7 +12,7 @@ All functions are implemented in *INDEPENDENT* mode
 The macro *CHANGEABLE_ACTIVATION_AND_AGGREGATION* allows programs to change the activation and aggregation functions.
 
 *Note*: when initializing ann::neuralnet in *CHANGEABLE_ACTIVATION_AND_AGGREGATION* make sure to
-initialize activation_funcs or aggregation_funcs unless you are using the default list in the
+initialize activation_funcs or aggregation_funcs, even if you are using the default list in the
 neat::pool object. Otherwise things will crash and burn!
 
 # Bonus!

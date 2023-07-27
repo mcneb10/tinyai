@@ -1050,7 +1050,7 @@ namespace neat
 		{
 			specie new_specie;
 #ifdef GIVING_NAMES_FOR_SPECIES
-			new_specie.name = file.read_str();
+			new_specie.name = file.get_str();
 #endif
 
 			unsigned int specie_population;
@@ -1077,8 +1077,8 @@ namespace neat
 					file.scanf("%u%u%u%lf%c", &new_gene.innovation_num, &new_gene.from_node,
 							   &new_gene.to_node, &new_gene.weight, &new_gene.enabled);
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
-					new_gene.aggregation_name = file.read_str();
-					new_gene.activation_name = file.read_str();
+					new_gene.aggregation_name = file.get_str();
+					new_gene.activation_name = file.get_str();
 					new_gene.aggregation = this->aggregation_funcs.at(new_gene.aggregation_name);
 					new_gene.activation = this->activation_funcs.at(new_gene.activation_name);
 #endif

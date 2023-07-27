@@ -31,7 +31,7 @@ namespace ann
 		double value = 0.0;
 		bool visited = false;
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
-		double (*aggregation)(std::vector<double>&) = &neat::aggregation::sum;
+		double (*aggregation)(std::vector<double> &) = &neat::aggregation::sum;
 		std::string aggregation_name = "sum";
 		double (*activation)(double) = &neat::activation::sigmoid;
 		std::string activation_name = "sigmoid";
@@ -60,9 +60,11 @@ namespace ann
 #else
 	public:
 		std::map<std::string, double (*)(double)> activation_funcs;
-		std::map<std::string, double (*)(std::vector<double>&)> aggregation_funcs;
+		std::map<std::string, double (*)(std::vector<double> &)> aggregation_funcs;
+
 	private:
 #endif
+		// TODO: add bias support to (non)recurrent evaluate funcs in changeable ac/ag mode
 		void evaluate_nonrecurrent(const std::vector<double> &input, std::vector<double> &output)
 		{
 
@@ -99,7 +101,7 @@ namespace ann
 						input.push_back(nodes[nodes[t].in_nodes[i].first].value * nodes[t].in_nodes[i].second);
 					nodes[t].value = nodes[t].activation(nodes[t].aggregation(input));
 #else
-double sum = 0.0;
+					double sum = 0.0;
 					for (size_t i = 0; i < nodes[t].in_nodes.size(); i++)
 						sum += nodes[nodes[t].in_nodes[i].first].value * nodes[t].in_nodes[i].second;
 					nodes[t].value = sigmoid(sum);
@@ -143,13 +145,13 @@ double sum = 0.0;
 			for (size_t i = 0; i < nodes.size(); i++)
 			{
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
-	std::vector<double> input;
-	for (size_t j = 0; j < nodes[i].in_nodes.size(); j++) //FIXME: is this supposed to be addition
+				std::vector<double> input;
+				for (size_t j = 0; j < nodes[i].in_nodes.size(); j++) // FIXME: is this supposed to be addition
 					input.push_back(nodes[nodes[i].in_nodes[j].first].value + nodes[i].in_nodes[j].second);
 				if (nodes[i].in_nodes.size() > 0)
 					nodes[i].value = nodes[i].activation(nodes[i].aggregation(input));
 #else
-double sum = 0.0;
+				double sum = 0.0;
 				for (size_t j = 0; j < nodes[i].in_nodes.size(); j++)
 					sum += nodes[nodes[i].in_nodes[j].first].value + nodes[i].in_nodes[j].second;
 				if (nodes[i].in_nodes.size() > 0)
@@ -258,7 +260,6 @@ double sum = 0.0;
 				// "non-recurrent" but it was checking for "non_recurrent",
 				// but non-recurrent is the default anyway
 				this->recurrent = false;
-
 #ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
 			rec = file.get_str();
 			if (rec != "CHANGEABLE_ACTIVATION_AND_AGGREGATION")
@@ -278,6 +279,7 @@ double sum = 0.0;
 				nodes[i].value = 0.0;
 				nodes[i].visited = false;
 
+				file.skip_space_and_newline();
 				file.scanf("%u", &type);
 				if (type == 1)
 					input_nodes.push_back(i);

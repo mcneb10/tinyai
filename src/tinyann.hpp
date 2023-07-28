@@ -30,11 +30,19 @@ namespace ann
 		int type = 0; // 0 = ordinal, 1 = input, 2 = output, 3 = bias
 		double value = 0.0;
 		bool visited = false;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+		double (*aggregation)(std::vector<double> &) = &neat::aggregation::sum;
+		std::string aggregation_name = "sum";
+		double (*activation)(double) = &neat::activation::sigmoid;
+		std::string activation_name = "sigmoid";
+#endif
 		std::vector<std::pair<size_t, double>> in_nodes;
 		neuron() {}
 		~neuron() { in_nodes.clear(); }
 	};
 
+	// NOTE: you MUST set activation_funcs and aggregation_funcs when you make a ann::neuralnet
+	// in CHANGEABLE_ACTIVATION_AND_AGGREGATION mode otherwise things will break!
 	class neuralnet
 	{
 	private:
@@ -44,12 +52,19 @@ namespace ann
 		std::vector<size_t> input_nodes;
 		std::vector<size_t> bias_nodes;
 		std::vector<size_t> output_nodes;
-
+#if !defined(CHANGEABLE_ACTIVATION_AND_AGGREGATION)
 		double sigmoid(double x)
 		{
 			return 2.0 / (1.0 + std::exp(-4.9 * x)) - 1;
 		}
+#else
+	public:
+		std::map<std::string, double (*)(double)> activation_funcs;
+		std::map<std::string, double (*)(std::vector<double> &)> aggregation_funcs;
 
+	private:
+#endif
+		// TODO: add bias support to (non)recurrent evaluate funcs in changeable ac/ag mode
 		void evaluate_nonrecurrent(const std::vector<double> &input, std::vector<double> &output)
 		{
 
@@ -78,10 +93,19 @@ namespace ann
 
 				if (nodes[t].visited == true)
 				{
+// first is the other node
+// second is weight
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					std::vector<double> input;
+					for (size_t i = 0; i < nodes[t].in_nodes.size(); i++)
+						input.push_back(nodes[nodes[t].in_nodes[i].first].value * nodes[t].in_nodes[i].second);
+					nodes[t].value = nodes[t].activation(nodes[t].aggregation(input));
+#else
 					double sum = 0.0;
 					for (size_t i = 0; i < nodes[t].in_nodes.size(); i++)
 						sum += nodes[nodes[t].in_nodes[i].first].value * nodes[t].in_nodes[i].second;
 					nodes[t].value = sigmoid(sum);
+#endif
 					s.pop();
 				}
 
@@ -99,7 +123,7 @@ namespace ann
 			for (size_t i = 0; i < output_nodes.size() && i < output.size(); i++)
 				output[i] = nodes[output_nodes[i]].value;
 		}
-
+		// FIXME: this probably isn't implemented correctly
 		void evaluate_recurrent(const std::vector<double> &input, std::vector<double> &output)
 		{
 
@@ -120,11 +144,19 @@ namespace ann
 			// and the values will be saved till the next simulation step
 			for (size_t i = 0; i < nodes.size(); i++)
 			{
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+				std::vector<double> input;
+				for (size_t j = 0; j < nodes[i].in_nodes.size(); j++) // FIXME: is this supposed to be addition
+					input.push_back(nodes[nodes[i].in_nodes[j].first].value + nodes[i].in_nodes[j].second);
+				if (nodes[i].in_nodes.size() > 0)
+					nodes[i].value = nodes[i].activation(nodes[i].aggregation(input));
+#else
 				double sum = 0.0;
 				for (size_t j = 0; j < nodes[i].in_nodes.size(); j++)
 					sum += nodes[nodes[i].in_nodes[j].first].value + nodes[i].in_nodes[j].second;
 				if (nodes[i].in_nodes.size() > 0)
 					nodes[i].value = sigmoid(sum);
+#endif
 			}
 
 			for (size_t i = 0; i < output_nodes.size() && i < output.size(); i++)
@@ -147,6 +179,8 @@ namespace ann
 			input_nodes.clear();
 			bias_nodes.clear();
 			output_nodes.clear();
+
+			// We can ignore these nodes as they don't use the ac/ag functions?
 
 			neuron tmp;
 			for (unsigned int i = 0; i < input_size; i++)
@@ -179,6 +213,13 @@ namespace ann
 					continue;
 
 				neuron n;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+				n.aggregation = it->second.aggregation;
+				n.activation = it->second.activation;
+				n.aggregation_name = it->second.aggregation_name;
+				n.activation_name = it->second.activation_name;
+#endif
+
 				if (table.find((*it).second.from_node) == table.end())
 				{
 					nodes.push_back(n);
@@ -204,7 +245,7 @@ namespace ann
 				this->evaluate_nonrecurrent(input, output);
 		}
 #ifdef INDEPENDENT
-		void import_fromfile(std::virtual_file& file)
+		void import_fromfile(std::virtual_file &file)
 		{
 			file.rewind();
 			this->nodes.clear();
@@ -214,8 +255,19 @@ namespace ann
 			std::string rec = file.get_str();
 			if (rec == "recurrent")
 				this->recurrent = true;
-			if (rec == "non_recurrent")
+			if (rec == "non-recurrent")
+				// there used to be a semi-bug here that files had this as
+				// "non-recurrent" but it was checking for "non_recurrent",
+				// but non-recurrent is the default anyway
 				this->recurrent = false;
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+			rec = file.get_str();
+			if (rec != "CHANGEABLE_ACTIVATION_AND_AGGREGATION")
+			{
+				printf("[ERROR] Failed to import a neural network without CHANGEABLE_ACTIVATION_AND_AGGREGATION enabled");
+				exit(-1);
+			}
+#endif
 
 			unsigned int neuron_number;
 			file.scanf("%u", &neuron_number);
@@ -227,6 +279,7 @@ namespace ann
 				nodes[i].value = 0.0;
 				nodes[i].visited = false;
 
+				file.skip_space_and_newline();
 				file.scanf("%u", &type);
 				if (type == 1)
 					input_nodes.push_back(i);
@@ -238,10 +291,17 @@ namespace ann
 				nodes[i].type = type;
 
 				file.scanf("%u", &input_size);
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+				nodes[i].aggregation_name = file.get_str();
+				nodes[i].activation_name = file.get_str();
+				nodes[i].aggregation = this->aggregation_funcs.at(nodes[i].aggregation_name);
+				nodes[i].activation = this->activation_funcs.at(nodes[i].activation_name);
+#endif
 				for (unsigned int j = 0; j < input_size; j++)
 				{
-					unsigned int t;
-					double w;
+					unsigned int t; // connected node
+					double w;		// weight
 					file.scanf("%u", &t);
 					file.scanf("%lf", &w);
 					nodes[i].in_nodes.push_back(std::make_pair(t, w));
@@ -267,8 +327,16 @@ namespace ann
 				o >> rec;
 				if (rec == "recurrent")
 					this->recurrent = true;
-				if (rec == "non_recurrent")
+				if (rec == "non-recurrent")
 					this->recurrent = false;
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+				o >> rec;
+				if (rec != "CHANGEABLE_ACTIVATION_AND_AGGREGATION")
+				{
+					throw "Failed to import a neural network without CHANGEABLE_ACTIVATION_AND_AGGREGATION enabled";
+				}
+#endif
 
 				unsigned int neuron_number;
 				o >> neuron_number;
@@ -291,6 +359,14 @@ namespace ann
 					nodes[i].type = type;
 
 					o >> input_size;
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+					o >> nodes[i].aggregation_name;
+					o >> nodes[i].activation_name;
+					nodes[i].aggregation = this->aggregation_funcs.at(nodes[i].aggregation_name);
+					nodes[i].activation = this->activation_funcs.at(nodes[i].activation_name);
+#endif
+
 					for (unsigned int j = 0; j < input_size; j++)
 					{
 						unsigned int t;
@@ -311,21 +387,30 @@ namespace ann
 
 // NOTE: std::endl replace with \n for more cross platform-ness
 #if INDEPENDENT
-		void export_tofile(std::virtual_file& file)
+		void export_tofile(std::virtual_file &file)
 		{
 			if (this->recurrent)
 				file.concat("recurrent\n");
 			else
 				file.concat("non-recurrent\n");
-			file.concat(std::to_string(nodes.size())+"\n\n");
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+			file.concat("CHANGEABLE_ACTIVATION_AND_AGGREGATION\n");
+#endif
+
+			file.concat(std::to_string(nodes.size()) + "\n\n");
 
 			for (size_t i = 0; i < nodes.size(); i++)
 			{
-				file.concat(std::to_string(nodes[i].type)+" "+std::to_string(nodes[i].in_nodes.size())+"\n");
+				file.concat(std::to_string(nodes[i].type) + " " + std::to_string(nodes[i].in_nodes.size()) + "\n");
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+				file.concat(nodes[i].aggregation_name + "\n");
+				file.concat(nodes[i].activation_name + "\n");
+#endif
 				for (unsigned int j = 0; j < nodes[i].in_nodes.size(); j++)
 				{
-					file.concat(std::to_string(nodes[i].in_nodes[j].first)+" "+
-					std::to_string(nodes[i].in_nodes[j].second)+" ");
+					file.concat(std::to_string(nodes[i].in_nodes[j].first) + " " +
+								std::to_string(nodes[i].in_nodes[j].second) + " ");
 				}
 				file.concat("\n\n");
 			}
@@ -340,12 +425,21 @@ namespace ann
 				o << "recurrent\n";
 			else
 				o << "non-recurrent\n";
+
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+			o << "CHANGEABLE_ACTIVATION_AND_AGGREGATION\n";
+#endif
+
 			o << nodes.size() << "\n\n";
 
 			for (size_t i = 0; i < nodes.size(); i++)
 			{
 				o << nodes[i].type << " ";
 				o << nodes[i].in_nodes.size() << "\n";
+#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+				o << nodes[i].aggregation_name << "\n";
+				o << nodes[i].activation_name << "\n";
+#endif
 				for (unsigned int j = 0; j < nodes[i].in_nodes.size(); j++)
 					o << nodes[i].in_nodes[j].first << " "
 					  << nodes[i].in_nodes[j].second << " ";

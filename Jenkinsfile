@@ -21,6 +21,8 @@ pipeline {
                 echo 'Testing...'
                 sh './experiments/xor/xor'
                 sh './experiments/xor/xor_independent'
+                sh './experiments/xor/xor_changeable_activation_aggregation'
+                sh './experiments/xor/xor_changeable_activation_aggregation_independent'
             }
         }
     }

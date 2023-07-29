@@ -395,6 +395,6 @@ __END__
 
 =head1 LICENSE
 
-This program is licensed under the same terms as Perl.
+This package is licensed under the same terms as Perl.
 
 =cut

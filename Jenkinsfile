@@ -8,7 +8,7 @@ pipeline {
                 sh 'sudo apt-get update'
                 echo '- Installing build tools'
                 sh 'sudo apt-get install -y build-essential perl graphviz'
-                sh 'cpan Object::Pad'
+                sh 'cpan Object::Pad File::Slurper'
             }
         }
         stage('Build') {

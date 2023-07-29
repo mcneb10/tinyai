@@ -27,8 +27,8 @@ pipeline {
                 sh './experiments/xor/xor_changeable_activation_aggregation_independent'
 
                 // Test bonus script
-                sh 'perl ./bonus/neuralnet2dot.pl -p ./experiments/xor/fit\ \=\ 200 ./graph200.gv'
-                sh 'perl ./bonus/neuralnet2dot.pl -p ./experiments/xor/fitc\ \=\ 200 ./graphc200.gv'
+                sh 'perl ./bonus/neuralnet2dot.pl -p ./experiments/xor/fit = 200 ./graph200.gv'
+                sh 'perl ./bonus/neuralnet2dot.pl -p ./experiments/xor/fitc = 200 ./graphc200.gv'
 
                 // Test graphviz output
                 sh 'dot -Tps ./graph200.gv -o graph200.ps'

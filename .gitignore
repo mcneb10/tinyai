@@ -13,6 +13,9 @@ fitc =*
 xor_test.res
 xor_test.resc
 
+*.gv
+*.tmp
+
 .vscode
 experiments/xor/xor
 experiments/xor/xor.exe

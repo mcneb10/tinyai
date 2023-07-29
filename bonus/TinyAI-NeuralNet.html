@@ -1,0 +1,235 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title></title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body>
+
+
+
+<ul id="index">
+  <li><a href="#NAME">NAME</a>
+    <ul>
+      <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+      <li><a href="#CLASSES">CLASSES</a>
+        <ul>
+          <li><a href="#Connection">Connection</a>
+            <ul>
+              <li><a href="#FIELDS">FIELDS</a></li>
+            </ul>
+          </li>
+          <li><a href="#Neuron">Neuron</a>
+            <ul>
+              <li><a href="#FIELDS1">FIELDS</a></li>
+              <li><a href="#METHODS">METHODS</a></li>
+            </ul>
+          </li>
+          <li><a href="#NeuralNet">NeuralNet</a>
+            <ul>
+              <li><a href="#FIELDS2">FIELDS</a></li>
+              <li><a href="#METHODS1">METHODS</a></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li><a href="#LICENSE">LICENSE</a></li>
+</ul>
+
+<h1 id="NAME">NAME</h1>
+
+<p><b>TinyAI::NeuralNet</b> - Perl representation of the tinyann.hpp neural network from TinyAI</p>
+
+<h2 id="SYNOPSIS">SYNOPSIS</h2>
+
+<p>This package contains classes that represent part of the tinyann neural network.</p>
+
+<h2 id="CLASSES">CLASSES</h2>
+
+<h3 id="Connection"><code>Connection</code></h3>
+
+<p>Represents a single connection between two <code>Neuron</code>s</p>
+
+<h4 id="FIELDS">FIELDS</h4>
+
+<dl>
+
+<dt id="from-int-required-in-constructor-reader"><code>from</code> =&gt; int, required in constructor, reader</dt>
+<dd>
+
+<p>The index of the node the connection is going from</p>
+
+</dd>
+<dt id="to-int-required-in-constructor-reader"><code>to</code> =&gt; int, required in constructor, reader</dt>
+<dd>
+
+<p>The index of the node the connection is going to</p>
+
+</dd>
+<dt id="weight-float-required-in-constructor-reader"><code>weight</code> =&gt; float, required in constructor, reader</dt>
+<dd>
+
+<p>The weight of the connection</p>
+
+</dd>
+</dl>
+
+<h3 id="Neuron"><code>Neuron</code></h3>
+
+<p>Represents a single node/neuron in the neural network</p>
+
+<h4 id="FIELDS1">FIELDS</h4>
+
+<dl>
+
+<dt id="type-int-required-in-constructor-reader"><code>type</code> =&gt; int, required in constructor, reader</dt>
+<dd>
+
+<p>The type of the node. Possible values:</p>
+
+<dl>
+
+<dt id="pod0"><code>0</code></dt>
+<dd>
+
+<p>A regular node</p>
+
+</dd>
+<dt id="pod1"><code>1</code></dt>
+<dd>
+
+<p>An input</p>
+
+</dd>
+<dt id="pod2"><code>2</code></dt>
+<dd>
+
+<p>An output</p>
+
+</dd>
+<dt id="pod3"><code>3</code></dt>
+<dd>
+
+<p>A bias node. Never seen one in the wild and i&#39;m not quite sure what they do.</p>
+
+</dd>
+</dl>
+
+</dd>
+<dt id="connections_from-Connection-array-writer-reader"><code>connections_from</code> =&gt; <code>Connection</code> array, writer, reader</dt>
+<dd>
+
+<p>The connections going from the node</p>
+
+</dd>
+<dt id="connections_to-Connection-array-writer-reader"><code>connections_to</code> =&gt; <code>Connection</code> array, writer, reader</dt>
+<dd>
+
+<p>The connections going to the node</p>
+
+</dd>
+<dt id="prune_if_pruning_enabled-boolean-writer-reader"><code>prune_if_pruning_enabled</code> =&gt; boolean, writer, reader</dt>
+<dd>
+
+<p>Should the node be hidden if pruning useless nodes is enabled in <code>dump_to_graphviz</code> in <code>NeuralNet</code>. This is true if the node isn&#39;t a Input, Output, or Bias node and the node doesn&#39;t connect anywhere or isn&#39;t connected to.</p>
+
+</dd>
+<dt id="activation-string-writer-reader"><code>activation</code> =&gt; string, writer, reader</dt>
+<dd>
+
+<p>The activation function name. Only set if the file was made by a program compiled in CHANGEABLE_ACTIVATION_AND_AGGREGATION mode and the node isn&#39;t an input/bias? node</p>
+
+</dd>
+<dt id="aggregation-string-writer-reader"><code>aggregation</code> =&gt; string, writer, reader</dt>
+<dd>
+
+<p>The aggregation function name. Only set if the file was made by a program compiled in CHANGEABLE_ACTIVATION_AND_AGGREGATION mode and the node isn&#39;t an input/bias? node</p>
+
+</dd>
+<dt id="already_visited-bool-reader"><code>already_visited</code> =&gt; bool, reader</dt>
+<dd>
+
+<p>Indicates if the node has been visited by <code>visit</code> and had <code>prune_if_pruning_enabled</code> set yet</p>
+
+</dd>
+</dl>
+
+<h4 id="METHODS">METHODS</h4>
+
+<dl>
+
+<dt id="visit-nodes:-array-of-Neurons"><code>visit</code>(<code>nodes</code>: array of <code>Neuron</code>s)</dt>
+<dd>
+
+<p>Looks at the connections of this <code>Neuron</code> and determines if it&#39;s useless and sets <code>prune_if_pruning_enabled</code> accoringly. Takes an array of <code>Neuron</code>s from the neural network as it&#39;s parameter. Returns the value of <code>prune_if_pruning_enabled</code>.</p>
+
+</dd>
+</dl>
+
+<h3 id="NeuralNet"><code>NeuralNet</code></h3>
+
+<p>A class the represents the Neural Network from tinyann.hpp</p>
+
+<h4 id="FIELDS2">FIELDS</h4>
+
+<dl>
+
+<dt id="recurrent-bool-reader"><code>recurrent</code> =&gt; bool, reader</dt>
+<dd>
+
+<p>Specifies if the Neural Network is recurrent.</p>
+
+</dd>
+<dt id="changeable_funcs-bool-reader"><code>changeable_funcs</code> =&gt; bool, reader</dt>
+<dd>
+
+<p>Specifies if the Neural Network has changeable activation and aggregation functions</p>
+
+</dd>
+<dt id="nodes-array-of-Neurons-reader"><code>nodes</code> =&gt; array of <code>Neuron</code>s, reader</dt>
+<dd>
+
+<p>The neurons/nodes in the Neural Network</p>
+
+</dd>
+<dt id="connections-array-of-Connections-reader"><code>connections</code> =&gt; array of <code>Connection</code>s, reader</dt>
+<dd>
+
+<p>The connections between nodes in the Neural Network</p>
+
+</dd>
+<dt id="data-string-required-in-constructor"><code>data</code> =&gt; string, required in constructor</dt>
+<dd>
+
+<p>The text data from the neural network file, to be &quot;deserialized&quot; into the fields in the <code>NeuralNetwork</code> class</p>
+
+</dd>
+</dl>
+
+<h4 id="METHODS1">METHODS</h4>
+
+<dl>
+
+<dt id="dump_to_graphviz-prune_unused_nodes:-boolean-optional"><code>dump_to_graphviz</code>(<code>prune_unused_nodes</code>: boolean, optional)</dt>
+<dd>
+
+<p>Dump the neural network do a <b>DOT</b> digraph. If <code>prune_unused_nodes</code> is specified and set to 1, useless nodes won&#39;t be included in the graph. Returns the generated <b>DOT</b> code.</p>
+
+</dd>
+</dl>
+
+<h1 id="LICENSE">LICENSE</h1>
+
+<p>This program is licensed under the same terms as Perl.</p>
+
+
+</body>
+
+</html>
+
+

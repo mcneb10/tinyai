@@ -4,6 +4,9 @@
 #include <cmath>
 #include <tinyneat.hpp>
 #include <tinyann.hpp>
+#ifdef WIN32
+	#include <time.h>
+#endif
 
 // returns the fitness.
 unsigned int xor_test(ann::neuralnet& n, bool write_output){

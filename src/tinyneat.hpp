@@ -25,9 +25,14 @@
 #include <string>
 #include <vector>
 
+#ifdef OPENCL
+	#include "opencl.h"
+	include_opencl_file(test, "./opencl/aggregations.cl");
+#endif
+
 namespace neat
 {
-#ifdef CHANGEABLE_ACTIVATION_AND_AGGREGATION
+#if defined(CHANGEABLE_ACTIVATION_AND_AGGREGATION) && !defined(OPENCL)
 	namespace aggregation
 	{
 		double sum(std::vector<double> &a)
@@ -310,6 +315,16 @@ namespace neat
 			this->aggregation_funcs = ag;
 			this->dac = defaultActivation;
 			this->dag = defaultAggregation;
+#endif
+
+#ifdef OPENCL
+			std::vector<cl::Platform> platforms;
+			cl::Platform::get(&platforms);
+
+			if(platforms.empty()) {
+				printf("No OpenCL platforms found!\n");
+				exit(-1);
+			}
 #endif
 
 			// seed the mersenne twister with

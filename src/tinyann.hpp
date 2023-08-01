@@ -12,6 +12,9 @@
 #endif
 #include <algorithm>
 #include <vector>
+#ifdef OPENCL
+	#include "opencl.h"
+#endif
 
 #include "tinyneat.hpp"
 

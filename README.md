@@ -15,6 +15,8 @@ The macro *CHANGEABLE_ACTIVATION_AND_AGGREGATION* allows programs to change the 
 initialize activation_funcs or aggregation_funcs, even if you are using the default list in the
 neat::pool object. Otherwise things will crash and burn!
 
+The *OPENCL* macro will enable opencl support
+
 # Bonus!
 
 As an added bonus, i'll add in Perl a script to convert a gene to DOT absolutely free! (coming soon)

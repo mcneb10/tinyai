@@ -24,6 +24,9 @@
 #include <random>
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#include <limits>
+#endif
 
 namespace neat
 {

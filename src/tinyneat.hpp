@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 #ifdef _WIN32
+#undef max
+#undef min
 #include <limits>
 #endif
 
